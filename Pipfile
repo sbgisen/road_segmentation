@@ -23,6 +23,8 @@ keras = "*"
 requests = "*"
 pyyaml = "*"
 rospkg = "*"
+ipython = "*"
+scikit-learn = "*"
 
 [requires]
 python_version = "3.8"
