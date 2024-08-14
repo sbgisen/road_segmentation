@@ -75,6 +75,29 @@ class RoadSegmentationNode:
 
         return result, result_mask
 
+    def create_debug_image(self, image, result_mask):
+        # Resize result_mask to match the original image size
+        result_mask = cv2.resize(result_mask, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_NEAREST)
+
+        # Overlay the segmentation result on the original image
+        frame2 = image / 2
+        frame2[result_mask == 1] += [0, 0, 0]
+        frame2[result_mask == 2] += [0.5, 0.5, 0]
+        frame2[result_mask == 3] += [0.2, 0.7, 0.5]
+        frame2[result_mask == 4] += [0, 0.5, 0.5]
+        frame2[result_mask == 5] += [0, 0, 0.5]
+        frame2[result_mask == 6] += [0.5, 0, 0]
+        debug_image = np.uint8(frame2)
+        return debug_image
+
+    def publish_debug_image(self, debug_image):
+        try:
+            # Convert the CV2 image back to a ROS Image message
+            debug_image_msg = bridge.cv2_to_imgmsg(debug_image, encoding='bgr8')
+            self.debug_image_pub.publish(debug_image_msg)
+        except CvBridgeError as e:
+            rospy.logerr("CvBridge Error: {0}".format(e))
+
     def image_callback(self, msg):
         try:
             # Convert the ROS Image message to a CV2 image
@@ -98,29 +121,6 @@ class RoadSegmentationNode:
         # Fill classification_result with actual data here
 
         self.result_pub.publish(classification_result)
-
-    def create_debug_image(self, image, result_mask):
-        # Resize result_mask to match the original image size
-        result_mask = cv2.resize(result_mask, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_NEAREST)
-
-        # Overlay the segmentation result on the original image
-        frame2 = image / 2
-        frame2[result_mask == 1] += [0, 0, 0]
-        frame2[result_mask == 2] += [0.5, 0.5, 0]
-        frame2[result_mask == 3] += [0.2, 0.7, 0.5]
-        frame2[result_mask == 4] += [0, 0.5, 0.5]
-        frame2[result_mask == 5] += [0, 0, 0.5]
-        frame2[result_mask == 6] += [0.5, 0, 0]
-        debug_image = np.uint8(frame2)
-        return debug_image
-
-    def publish_debug_image(self, debug_image):
-        try:
-            # Convert the CV2 image back to a ROS Image message
-            debug_image_msg = bridge.cv2_to_imgmsg(debug_image, encoding='bgr8')
-            self.debug_image_pub.publish(debug_image_msg)
-        except CvBridgeError as e:
-            rospy.logerr("CvBridge Error: {0}".format(e))
 
 
 if __name__ == '__main__':
