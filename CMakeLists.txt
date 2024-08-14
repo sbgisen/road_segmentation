@@ -22,13 +22,3 @@ catkin_package(
 )
 
 include_directories(${catkin_INCLUDE_DIRS})
-
-# catkin_install_python(
-#   PROGRAMS scripts/road_segmentation_node.py
-#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
-
-install(
-  DIRECTORY src/road_segmentation/
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/road_segmentation
-)

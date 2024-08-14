@@ -11,7 +11,21 @@
 * ### Development environment
 
 
-  ubuntu 18.04, tensorflow 2.0.0, opencv-python 4.2.0.32, numpy 1.18.2
+  ubuntu 20.04, tensorflow 2.4.0, opencv-python 4.2.0.32, numpy 1.18.2
+
+* ### Setup
+- Install cuda 11.8
+- Install cuDNN 8.9.7 for cuda 11.8
+- pipenv install
+- add below in ~/.bashrc
+```bash
+## CUDA and cuDNN paths
+export PATH=/usr/local/cuda-11.8/bin:${PATH}
+export LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64:${LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=/usr/local/cuda-11.8/targets/x86_64-linux/lib:${LD_LIBRARY_PATH}
+```
+- run `sudo ln -s /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcusolver.so.11 /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcusolver.so.10`
+  - Reference:[WSL2 + Ubuntu20.04 + CUDA 11.4 で TensorFlow 環境構築](https://zenn.dev/ylabo0717/articles/48796b7f3470c7)
 
 * ### model
 
