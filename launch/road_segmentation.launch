@@ -2,6 +2,7 @@
 <launch>
   <!-- Argument for camera topic, default is set to "/camera/image_raw" -->
   <arg name="camera_topic" default="/camera/image_raw"/>
+  <arg name="camera_info_topic" default="/camera/camera_info"/>
   <arg name="debug" default="true"/>
 
   <!-- Model path argument -->
@@ -13,6 +14,7 @@
   <!-- Node execution -->
   <node pkg="road_segmentation" type="road_segmentation_node.py" name="road_segmentation_node" output="screen">
     <param name="camera_topic" value="$(arg camera_topic)"/>
+    <param name="camera_info_topic" value="$(arg camera_info_topic)"/>
     <param name="model_path" value="$(arg model_path)"/>
     <param name="debug" value="$(arg debug)"/>
   </node>
