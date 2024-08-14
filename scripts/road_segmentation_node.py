@@ -13,8 +13,6 @@ from jsk_recognition_msgs.msg import ClassificationResult
 from sensor_msgs.msg import Image
 
 from road_segmentation.data_loader.display import create_mask
-from road_segmentation.model_loader import load_model
-from road_segmentation.model_loader import predict
 
 bridge = CvBridge()
 
@@ -44,7 +42,7 @@ class RoadSegmentationNode:
         self.debug = rospy.get_param('~debug', False)
 
         # Load the segmentation model
-        self.model = load_model(self.model_path)
+        self.model = tensorflow.keras.models.load_model(self.model_path)
 
         # Get input image size from model
         self.input_image_size = self.model.input_shape[1:3]  # (height, width)
@@ -68,9 +66,9 @@ class RoadSegmentationNode:
         input_image = input_image / 255.0  # Normalize input
 
         # Get the segmentation result (class map)
-        result = predict(self.model, input_image)
+        result = self.model.predict(input_image)
 
-        # Convert the result to a mask image
+        # Convert the result to a mask image using create_mask
         result_mask = create_mask(result).numpy()
 
         return result, result_mask
@@ -80,7 +78,7 @@ class RoadSegmentationNode:
         result_mask = cv2.resize(result_mask, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_NEAREST)
 
         # Overlay the segmentation result on the original image
-        frame2 = image / 2
+        frame2 = image / 2.0
         frame2[result_mask == 1] += [0, 0, 0]
         frame2[result_mask == 2] += [0.5, 0.5, 0]
         frame2[result_mask == 3] += [0.2, 0.7, 0.5]
@@ -108,7 +106,10 @@ class RoadSegmentationNode:
 
         # Perform segmentation on the received image
         result, result_mask = self.perform_segmentation(cv_image)
-        self.publish_result(result)
+
+        # Publish result only if it has meaningful content
+        if np.any(result_mask):
+            self.publish_result(result)
 
         # If debug mode is enabled, publish the debug image
         if self.debug:
@@ -116,11 +117,14 @@ class RoadSegmentationNode:
             self.publish_debug_image(debug_image)
 
     def publish_result(self, result):
-        # Publish the segmentation result
+        # Create and fill ClassificationResult message
         classification_result = ClassificationResult()
-        # Fill classification_result with actual data here
+        # Fill classification_result with actual data here if necessary
+        # Example: classification_result.labels = [list of labels]
 
-        self.result_pub.publish(classification_result)
+        # Only publish if there is content
+        if classification_result.labels:
+            self.result_pub.publish(classification_result)
 
 
 if __name__ == '__main__':
