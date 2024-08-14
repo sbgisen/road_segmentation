@@ -1,3 +1,5 @@
+#!/usr/bin/env pipenv-shebang
+# -*- coding:utf-8 -*-
 from IPython.display import clear_output
 from data_loader import *
 import matplotlib.pyplot as plt

@@ -1,0 +1,20 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+
+[packages]
+tensorflow = "==2.4.0"
+opencv-python = "*"
+numpy = "*"
+pandas = "*"
+matplotlib = "*"
+keras = "*"
+requests = "*"
+pyyaml = "*"
+rospkg = "*"
+
+[requires]
+python_version = "3.8"

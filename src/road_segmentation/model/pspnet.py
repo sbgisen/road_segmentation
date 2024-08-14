@@ -1,4 +1,5 @@
-
+#!/usr/bin/env pipenv-shebang
+# -*- coding:utf-8 -*-
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers

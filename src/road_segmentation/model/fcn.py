@@ -1,3 +1,5 @@
+#!/usr/bin/env pipenv-shebang
+# -*- coding:utf-8 -*-
 import numpy as np
 from tensorflow.keras import Sequential
 from tensorflow.keras.applications.vgg16 import VGG16

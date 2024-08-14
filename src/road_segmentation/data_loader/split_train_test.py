@@ -1,3 +1,5 @@
+#!/usr/bin/env pipenv-shebang
+# -*- coding:utf-8 -*-
 from data_loader import train_images, mask_images
 import shutil
 
