@@ -16,7 +16,6 @@
 * ### Setup
 - Install cuda 11.8
 - Install cuDNN 8.9.7 for cuda 11.8
-- pipenv install
 - add below in ~/.bashrc
 ```bash
 ## CUDA and cuDNN paths
@@ -26,6 +25,7 @@ export LD_LIBRARY_PATH=/usr/local/cuda-11.8/targets/x86_64-linux/lib:${LD_LIBRAR
 ```
 - run `sudo ln -s /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcusolver.so.11 /usr/local/cuda-11.8/targets/x86_64-linux/lib/libcusolver.so.10`
   - Reference:[WSL2 + Ubuntu20.04 + CUDA 11.4 で TensorFlow 環境構築](https://zenn.dev/ylabo0717/articles/48796b7f3470c7)
+- run `pipenv install` in this package
 
 * ### model
 
