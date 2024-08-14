@@ -78,12 +78,9 @@ class RoadSegmentationNode:
         # Convert the result to a mask image using create_mask
         result_mask = create_mask(result).numpy()
 
-        return result, result_mask
+        return result_mask
 
     def create_debug_image(self, image, result_mask):
-        # Resize result_mask to match the original image size
-        result_mask = cv2.resize(result_mask, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_NEAREST)
-
         # Apply colormap to visualize the mask
         result_mask_colored = cv2.applyColorMap((result_mask * 36).astype(np.uint8), cv2.COLORMAP_JET)
 
@@ -110,16 +107,23 @@ class RoadSegmentationNode:
             return
 
         # Perform segmentation on the received image
-        result, result_mask = self.perform_segmentation(cv_image)
+        result_mask = self.perform_segmentation(cv_image)
+
+        # Resize the entire mask to match the original image size
+        result_mask_resized = cv2.resize(
+            result_mask,
+            (cv_image.shape[1],
+             cv_image.shape[0]),
+            interpolation=cv2.INTER_NEAREST)
 
         # Publish the mask for each class
         for i in range(self.num_classes):
-            class_mask = (result_mask == i).astype(np.uint8) * 255
+            class_mask = (result_mask_resized == i).astype(np.uint8) * 255
             self.publish_class_mask(class_mask, self.result_pubs[i])
 
         # If debug mode is enabled, publish the debug image
         if self.debug:
-            debug_image = self.create_debug_image(cv_image, result_mask)
+            debug_image = self.create_debug_image(cv_image, result_mask_resized)
             self.publish_debug_image(debug_image)
 
     def publish_class_mask(self, class_mask, pub):
