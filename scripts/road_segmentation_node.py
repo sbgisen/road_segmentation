@@ -77,15 +77,13 @@ class RoadSegmentationNode:
         # Resize result_mask to match the original image size
         result_mask = cv2.resize(result_mask, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_NEAREST)
 
-        # Overlay the segmentation result on the original image
-        frame2 = image / 2.0
-        frame2[result_mask == 1] += [0, 0, 0]
-        frame2[result_mask == 2] += [0.5, 0.5, 0]
-        frame2[result_mask == 3] += [0.2, 0.7, 0.5]
-        frame2[result_mask == 4] += [0, 0.5, 0.5]
-        frame2[result_mask == 5] += [0, 0, 0.5]
-        frame2[result_mask == 6] += [0.5, 0, 0]
-        debug_image = np.uint8(frame2)
+        # Apply colormap to visualize the mask
+        result_mask_colored = cv2.applyColorMap((result_mask * 36).astype(np.uint8), cv2.COLORMAP_JET)
+
+        # Overlay the segmentation result on the original image with transparency
+        alpha = 0.6
+        debug_image = cv2.addWeighted(image, alpha, result_mask_colored, 1 - alpha, 0)
+
         return debug_image
 
     def publish_debug_image(self, debug_image):
