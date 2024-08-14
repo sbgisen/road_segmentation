@@ -9,7 +9,6 @@ import rospy
 import tensorflow as tensorflow
 from cv_bridge import CvBridge
 from cv_bridge import CvBridgeError
-from jsk_recognition_msgs.msg import ClassificationResult
 from sensor_msgs.msg import Image
 
 from road_segmentation.data_loader.display import create_mask
@@ -39,7 +38,12 @@ class RoadSegmentationNode:
         )
         self.camera_topic = rospy.get_param('~camera_topic', '/camera/image_raw')
         self.model_path = rospy.get_param('~model_path', default_model_path)
-        self.debug = rospy.get_param('~debug', False)
+        self.debug = rospy.get_param('~debug', True)
+
+        # Load class names and labels from ROS parameter
+        class_data = rospy.get_param('class')
+        self.class_names = list(class_data.keys())
+        self.num_classes = len(self.class_names)
 
         # Load the segmentation model
         self.model = tensorflow.keras.models.load_model(self.model_path)
@@ -50,12 +54,15 @@ class RoadSegmentationNode:
         # Subscribe to the camera topic
         self.image_sub = rospy.Subscriber(self.camera_topic, Image, self.image_callback)
 
-        # Publisher for the segmentation result
-        self.result_pub = rospy.Publisher('/road_segmentation/result', ClassificationResult, queue_size=1)
+        # Publisher for the segmentation result for each class
+        self.result_pubs = []
+        for class_name in self.class_names:
+            pub = rospy.Publisher(f'~result/{class_name}_mask', Image, queue_size=1)
+            self.result_pubs.append(pub)
 
         # Publisher for debug image (only if debug mode is enabled)
         if self.debug:
-            self.debug_image_pub = rospy.Publisher('/road_segmentation/debug_image', Image, queue_size=1)
+            self.debug_image_pub = rospy.Publisher('~debug_image', Image, queue_size=1)
 
         rospy.loginfo("Road Segmentation Node Initialized")
 
@@ -105,24 +112,23 @@ class RoadSegmentationNode:
         # Perform segmentation on the received image
         result, result_mask = self.perform_segmentation(cv_image)
 
-        # Publish result only if it has meaningful content
-        if np.any(result_mask):
-            self.publish_result(result)
+        # Publish the mask for each class
+        for i in range(self.num_classes):
+            class_mask = (result_mask == i).astype(np.uint8) * 255
+            self.publish_class_mask(class_mask, self.result_pubs[i])
 
         # If debug mode is enabled, publish the debug image
         if self.debug:
             debug_image = self.create_debug_image(cv_image, result_mask)
             self.publish_debug_image(debug_image)
 
-    def publish_result(self, result):
-        # Create and fill ClassificationResult message
-        classification_result = ClassificationResult()
-        # Fill classification_result with actual data here if necessary
-        # Example: classification_result.labels = [list of labels]
-
-        # Only publish if there is content
-        if classification_result.labels:
-            self.result_pub.publish(classification_result)
+    def publish_class_mask(self, class_mask, pub):
+        try:
+            # Convert the CV2 image back to a ROS Image message
+            mask_msg = bridge.cv2_to_imgmsg(class_mask, encoding='mono8')
+            pub.publish(mask_msg)
+        except CvBridgeError as e:
+            rospy.logerr("CvBridge Error: {0}".format(e))
 
 
 if __name__ == '__main__':

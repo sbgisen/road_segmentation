@@ -1,0 +1,8 @@
+class:
+  Background: 0
+  Bike_lane: 1
+  Caution_zone: 2
+  Crosswalk: 3
+  braille_guide_blocks: 4
+  Roadway: 5
+  Sidewalk: 6

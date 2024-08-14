@@ -1,16 +1,19 @@
 <?xml version="1.0"?>
 <launch>
-    <!-- Argument for camera topic, default is set to "/camera/image_raw" -->
-    <arg name="camera_topic" default="/camera/image_raw" />
-    <arg name="debug" default="true" />
+  <!-- Argument for camera topic, default is set to "/camera/image_raw" -->
+  <arg name="camera_topic" default="/camera/image_raw"/>
+  <arg name="debug" default="true"/>
 
-    <!-- Model path argument -->
-    <arg name="model_path" default="$(find road_segmentation)/models/pspunet_weight.h5" />
+  <!-- Model path argument -->
+  <arg name="model_path" default="$(find road_segmentation)/models/pspunet_weight.h5"/>
 
-    <!-- Node execution -->
-    <node pkg="road_segmentation" type="road_segmentation_node.py" name="road_segmentation_node" output="screen">
-        <param name="camera_topic" value="$(arg camera_topic)" />
-        <param name="model_path" value="$(arg model_path)" />
-        <param name="debug" value="$(arg debug)" />
-    </node>
+  <!-- Load the class.yaml file contents into ROS parameter server -->
+  <rosparam file="$(find road_segmentation)/config/class.yaml" command="load"/>
+
+  <!-- Node execution -->
+  <node pkg="road_segmentation" type="road_segmentation_node.py" name="road_segmentation_node" output="screen">
+    <param name="camera_topic" value="$(arg camera_topic)"/>
+    <param name="model_path" value="$(arg model_path)"/>
+    <param name="debug" value="$(arg debug)"/>
+  </node>
 </launch>
