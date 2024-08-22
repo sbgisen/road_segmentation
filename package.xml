@@ -3,7 +3,7 @@
   <name>road_segmentation</name>
   <version>0.0.1</version>
   <description>The road_segmentation package</description>
-  
+
   <maintainer email="your_email@example.com">Your Name</maintainer>
   <license>BSD</license>
 
@@ -20,7 +20,6 @@
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>cv_bridge</exec_depend>
   <exec_depend>jsk_recognition_msgs</exec_depend>
-  
-  <export>
-  </export>
+  <exec_depend>usb_cam</exec_depend>
+
 </package>
