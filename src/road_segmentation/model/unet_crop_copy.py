@@ -1,3 +1,5 @@
+#!/usr/bin/env pipenv-shebang
+# -*- coding:utf-8 -*-
 import numpy as np
 from tensorflow.keras import Sequential
 import tensorflow as tf

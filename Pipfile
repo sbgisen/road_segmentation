@@ -1,0 +1,30 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[[source]]
+name = "pytorch_cuda"
+url = "https://download.pytorch.org/whl/cu118"
+verify_ssl = false
+
+[dev-packages]
+
+[packages]
+networkx = "==2.8.8"
+torch = {index = "pytorch_cuda",version = "==2.0.0+cu118"}
+torchvision = {index = "pytorch_cuda",version = "==0.15.1+cu118"}
+tensorflow = "==2.4.0"
+opencv-python = "*"
+numpy = "*"
+pandas = "*"
+matplotlib = "*"
+keras = "*"
+requests = "*"
+pyyaml = "*"
+rospkg = "*"
+ipython = "*"
+scikit-learn = "*"
+
+[requires]
+python_version = "3.8"
