@@ -9,10 +9,9 @@ import rospy
 import tensorflow as tensorflow
 from cv_bridge import CvBridge
 from cv_bridge import CvBridgeError
+from road_segmentation.data_loader.display import create_mask
 from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import Image
-
-from road_segmentation.data_loader.display import create_mask
 
 bridge = CvBridge()
 
@@ -78,8 +77,8 @@ class RoadSegmentationNode:
     def perform_segmentation(self, image):
         # Resize the input image to the size expected by the model
         input_image = cv2.resize(image, (self.input_image_size[1], self.input_image_size[0]))  # (width, height)
-        input_image = np.expand_dims(input_image, axis=0)
-        input_image = input_image / 255.0  # Normalize input
+        input_image = input_image[tensorflow.newaxis, ...]
+        input_image = input_image / 255  # Normalize input
 
         # Get the segmentation result (class map)
         result = self.model.predict(input_image)
@@ -90,12 +89,24 @@ class RoadSegmentationNode:
         return result_mask
 
     def create_debug_image(self, image, result_mask):
-        # Apply colormap to visualize the mask
-        result_mask_colored = cv2.applyColorMap((result_mask * 36).astype(np.uint8), cv2.COLORMAP_JET)
+        # Create a copy of the original image and reduce its brightness by half
+        overlay_image = image / 2
 
-        # Overlay the segmentation result on the original image with transparency
-        alpha = 0.6
-        debug_image = cv2.addWeighted(image, alpha, result_mask_colored, 1 - alpha, 0)
+        # Apply specific colors to each class
+        overlay_image[(result_mask == 0)] += [0, 0, 0]  # Class 0: "Background"
+        overlay_image[(result_mask == 1)] += [50, 0, 50]  # Class 1: "Bike_lane"
+        overlay_image[(result_mask == 2)] += [100, 100, 0]  # Class 2: "Caution_zone"
+        overlay_image[(result_mask == 3)] += [40, 140, 100]  # Class 3: "Crosswalk"
+        overlay_image[(result_mask == 4)] += [0, 100, 100]  # Class 4: "braille_guide_blocks"
+        overlay_image[(result_mask == 5)] += [0, 0, 100]  # Class 5: "Roadway"
+        overlay_image[(result_mask == 6)] += [100, 0, 0]  # Class 6: "Sidewalk"
+
+        # Ensure that the values are within the valid range [0, 1]
+        overlay_image = np.clip(overlay_image, 0, 255)
+
+        # Convert the image to uint8
+        # debug_image = np.uint8(overlay_image * 255)
+        debug_image = np.uint8(overlay_image)
 
         return debug_image
 
@@ -133,7 +144,6 @@ class RoadSegmentationNode:
         except CvBridgeError as e:
             rospy.logerr("CvBridge Error: {0}".format(e))
             return
-
         # Perform segmentation on the received image
         result_mask = self.perform_segmentation(cv_image)
 
