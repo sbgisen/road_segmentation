@@ -148,7 +148,7 @@ class RoadSegmentationNode:
     def create_debug_image(self, image, result_mask):
         overlay_image = image / 2
         overlay_image[(result_mask == 0)] += [0, 0, 0]
-        overlay_image[(result_mask == 1)] += [50, 0, 50]
+        overlay_image[(result_mask == 1)] += [20, 0, 20]
         overlay_image[(result_mask == 2)] += [100, 100, 0]
         overlay_image[(result_mask == 3)] += [40, 140, 100]
         overlay_image[(result_mask == 4)] += [0, 100, 100]
