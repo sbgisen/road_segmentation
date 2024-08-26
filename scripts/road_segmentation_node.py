@@ -50,7 +50,7 @@ class RoadSegmentationNode:
         self.model = tensorflow.keras.models.load_model(self.model_path)
 
         # Get input image size from model
-        self.input_image_size = self.model.input_shape[1:3]  # (height, width)
+        self.trained_image_size = self.model.input_shape[1:3]  # (height, width)
 
         # Subscribe to the camera and camera_info topics
         self.image_sub = rospy.Subscriber(self.camera_topic, Image, self.image_callback)
@@ -74,11 +74,38 @@ class RoadSegmentationNode:
     def camera_info_callback(self, msg):
         self.current_camera_info = msg
 
+    def crop_and_resize_image(self, image, target_size):
+        # Get the dimensions of the input image
+        height, width, _ = image.shape
+        target_height, target_width = target_size
+
+        # Calculate the aspect ratios
+        input_aspect_ratio = width / height
+        target_aspect_ratio = target_width / target_height
+
+        # Crop the image to match the aspect ratio of the target size
+        if input_aspect_ratio > target_aspect_ratio:
+            # Input image is wider than the target aspect ratio
+            new_width = int(target_aspect_ratio * height)
+            offset = (width - new_width) // 2
+            cropped_image = image[:, offset:offset + new_width]
+        else:
+            # Input image is taller than the target aspect ratio
+            new_height = int(width / target_aspect_ratio)
+            offset = (height - new_height) // 2
+            cropped_image = image[offset:offset + new_height, :]
+
+        # Resize the cropped image to the target size
+        resized_image = cv2.resize(cropped_image, (target_width, target_height))  # (width, height)
+
+        return resized_image
+
     def perform_segmentation(self, image):
-        # Resize the input image to the size expected by the model
-        input_image = cv2.resize(image, (self.input_image_size[1], self.input_image_size[0]))  # (width, height)
+        # Crop and resize the input image to the size expected by the model
+        input_image = self.crop_and_resize_image(image, self.trained_image_size)
+
         input_image = input_image[tensorflow.newaxis, ...]
-        input_image = input_image / 255  # Normalize input
+        input_image = input_image / 255.0  # Normalize input
 
         # Get the segmentation result (class map)
         result = self.model.predict(input_image)
@@ -101,11 +128,10 @@ class RoadSegmentationNode:
         overlay_image[(result_mask == 5)] += [0, 0, 100]  # Class 5: "Roadway"
         overlay_image[(result_mask == 6)] += [100, 0, 0]  # Class 6: "Sidewalk"
 
-        # Ensure that the values are within the valid range [0, 1]
+        # Ensure that the values are within the valid range [0, 255]
         overlay_image = np.clip(overlay_image, 0, 255)
 
         # Convert the image to uint8
-        # debug_image = np.uint8(overlay_image * 255)
         debug_image = np.uint8(overlay_image)
 
         return debug_image
@@ -144,20 +170,25 @@ class RoadSegmentationNode:
         except CvBridgeError as e:
             rospy.logerr("CvBridge Error: {0}".format(e))
             return
-        # Perform segmentation on the received image
-        result_mask = self.perform_segmentation(cv_image)
 
-        # Resize the entire mask to match the original image size
+        # Crop and resize the input image for segmentation
+        resized_image = self.crop_and_resize_image(cv_image, self.trained_image_size)
+
+        # Perform segmentation on the resized image
+        result_mask = self.perform_segmentation(resized_image)
+
+        # Resize the entire mask to match the original resized image size
         result_mask_resized = cv2.resize(
             result_mask,
-            (cv_image.shape[1],
-             cv_image.shape[0]),
-            interpolation=cv2.INTER_NEAREST)
+            (resized_image.shape[1], resized_image.shape[0]),
+            interpolation=cv2.INTER_NEAREST
+        )
 
         # Adjust the camera info for the resized mask
         if self.current_camera_info is not None:
             adjusted_camera_info = self.adjust_camera_info(
-                self.current_camera_info, cv_image.shape[1], cv_image.shape[0])
+                self.current_camera_info, resized_image.shape[1], resized_image.shape[0]
+            )
             self.camera_info_pub.publish(adjusted_camera_info)
 
         # Publish the mask for each class
@@ -165,9 +196,9 @@ class RoadSegmentationNode:
             class_mask = (result_mask_resized == i).astype(np.uint8) * 255
             self.publish_class_mask(class_mask, self.result_pubs[i])
 
-        # If debug mode is enabled, publish the debug image
+        # If debug mode is enabled, publish the debug image using the resized image
         if self.debug:
-            debug_image = self.create_debug_image(cv_image, result_mask_resized)
+            debug_image = self.create_debug_image(resized_image, result_mask_resized)
             self.publish_debug_image(debug_image)
 
     def publish_class_mask(self, class_mask, pub):
