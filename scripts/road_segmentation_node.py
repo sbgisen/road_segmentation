@@ -144,20 +144,56 @@ class RoadSegmentationNode:
         except CvBridgeError as e:
             rospy.logerr("CvBridge Error: {0}".format(e))
 
-    def adjust_camera_info(self, original_info, target_width, target_height):
-        scale_x = target_width / float(original_info.width)
-        scale_y = target_height / float(original_info.height)
+    def crop_and_resize_camera_info(self, original_info, target_width, target_height):
+        # Get original image size from CameraInfo
+        original_width = original_info.width
+        original_height = original_info.height
 
+        # Calculate aspect ratios
+        target_aspect_ratio = target_width / target_height
+        input_aspect_ratio = original_width / original_height
+
+        # Determine crop offset and size based on aspect ratio
+        if input_aspect_ratio > target_aspect_ratio:
+            # If the image is wider than the target aspect ratio, crop width
+            new_width = int(target_aspect_ratio * original_height)
+            crop_offset_x = (original_width - new_width) // 2
+            crop_offset_y = 0
+            cropped_width = new_width
+            cropped_height = original_height
+        else:
+            # If the image is taller than the target aspect ratio, crop height
+            new_height = int(original_width / target_aspect_ratio)
+            crop_offset_x = 0
+            crop_offset_y = (original_height - new_height) // 2
+            cropped_width = original_width
+            cropped_height = new_height
+
+        # Calculate scaling factors for resizing
+        scale_x = target_width / float(cropped_width)
+        scale_y = target_height / float(cropped_height)
+
+        # Adjust the camera information
         adjusted_info = CameraInfo()
         adjusted_info.header = original_info.header
         adjusted_info.width = target_width
         adjusted_info.height = target_height
-        adjusted_info.K = [scale_x * original_info.K[0], 0, scale_x * original_info.K[2],
-                           0, scale_y * original_info.K[4], scale_y * original_info.K[5],
-                           0, 0, 1]
-        adjusted_info.P = [scale_x * original_info.P[0], 0, scale_x * original_info.P[2], 0,
-                           0, scale_y * original_info.P[5], scale_y * original_info.P[6], 0,
-                           0, 0, 1, 0]
+
+        # Adjust the K matrix (intrinsic camera matrix)
+        adjusted_info.K = [
+            scale_x * original_info.K[0], 0, scale_x * (original_info.K[2] - crop_offset_x),
+            0, scale_y * original_info.K[4], scale_y * (original_info.K[5] - crop_offset_y),
+            0, 0, 1
+        ]
+
+        # Adjust the P matrix (projection matrix)
+        adjusted_info.P = [
+            scale_x * original_info.P[0], 0, scale_x * (original_info.P[2] - crop_offset_x), 0,
+            0, scale_y * original_info.P[5], scale_y * (original_info.P[6] - crop_offset_y), 0,
+            0, 0, 1, 0
+        ]
+
+        # Keep other camera parameters unchanged
         adjusted_info.D = original_info.D
         adjusted_info.R = original_info.R
 
@@ -171,7 +207,6 @@ class RoadSegmentationNode:
             rospy.logerr("CvBridge Error: {0}".format(e))
             return
 
-        # Crop and resize the input image for segmentation
         resized_image = self.crop_and_resize_image(cv_image, self.trained_image_size)
 
         # Perform segmentation on the resized image
@@ -184,9 +219,9 @@ class RoadSegmentationNode:
             interpolation=cv2.INTER_NEAREST
         )
 
-        # Adjust the camera info for the resized mask
+        # Adjust the camera info based on the cropped and resized image
         if self.current_camera_info is not None:
-            adjusted_camera_info = self.adjust_camera_info(
+            adjusted_camera_info = self.crop_and_resize_camera_info(
                 self.current_camera_info, resized_image.shape[1], resized_image.shape[0]
             )
             self.camera_info_pub.publish(adjusted_camera_info)
