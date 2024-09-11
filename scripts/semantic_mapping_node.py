@@ -17,10 +17,10 @@
 #
 
 import math
-
 import numpy as np
 import rospy
 import tf
+import cv2
 from cv_bridge import CvBridge
 from geometry_msgs.msg import Point
 from geometry_msgs.msg import Pose
@@ -52,9 +52,9 @@ class SemanticMappingNode:
         self.fov_y_range_array = None
         self.distance_x_map = None
         self.distance_y_map = None
-        # self.grid_map = None
         self.z_difference = None
         self.x_difference = None
+        self.resized_image = None
         self.handle_insta360_height()
 
         rospy.loginfo("Semantic Mapping Node Initialized")
@@ -64,19 +64,14 @@ class SemanticMappingNode:
             self.current_camera_info = msg
             self.camera_matrix = np.array(msg.K).reshape((3, 3))
             self.calc_pixel_degree(self.current_camera_info)
-            rospy.loginfo("Camera info received and FOV calculated.")
         else:
             self.current_camera_info = msg
 
     def image_callback(self, msg: Image) -> None:
-        # rospy.loginfo("Received an image")
-
         if self.z_difference is None:
             rospy.logwarn("Z-axis difference is not available yet. Waiting for transform.")
             rospy.sleep(0.1)
             return
-
-        # self.z_difference = getattr(self, 'z_difference', 1.0)
 
         if self.current_camera_info is None:
             rospy.logwarn("Camera info is not yet available")
@@ -88,14 +83,7 @@ class SemanticMappingNode:
 
         self.calc_pixel_distance(self.current_camera_info, self.z_difference)
 
-        # If debug mode is enabled, publish the debug image
-        if self.debug:
-            self.publish_debug_image(msg)
-
         self.mapping_image(msg, self.current_camera_info)
-
-    def publish_debug_image(self, debug_image: Image) -> None:
-        self.debug_image_pub.publish(debug_image)
 
     def handle_insta360_height(self) -> None:
         # tfのリスナーを作成
@@ -108,13 +96,12 @@ class SemanticMappingNode:
 
         while not rospy.is_shutdown():
             try:
-                # "base_link"フレームから"insta360_base_link"フレームへの変換を取得
+                # "base_link"フレームから"insta360_front_optical_frame"フレームへの変換を取得
                 (trans, rot) = listener.lookupTransform('/base_link', '/insta360_front_optical_frame', rospy.Time(0))
 
                 # Z軸の差分を取得
                 self.z_difference = trans[2]  # trans[2]がZ軸の平行移動成分
                 self.x_difference = trans[0]
-                rospy.loginfo(self.x_difference)
                 break
 
             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
@@ -128,14 +115,44 @@ class SemanticMappingNode:
 
             # ループを回す
             rate.sleep()
+    
+    def image_resize(self, msg: Image, camera_info: CameraInfo) -> None:
+        before_image = self.bridge.imgmsg_to_cv2(msg, "mono8")
+        image_resize = cv2.resize(before_image, (426, 240))
+        self.resized_image = self.bridge.cv2_to_imgmsg(image_resize, "mono8")
 
     def calc_pixel_degree(self, camera_info: CameraInfo) -> None:
         fx = camera_info.K[0]
         fy = camera_info.K[4]
-        cx = camera_info.K[2]
-        cy = camera_info.K[5]
-        width = camera_info.width
-        height = camera_info.height
+        # cx = camera_info.K[2]
+        # cy = camera_info.K[5]
+        width = camera_info.roi.width
+        height = camera_info.roi.height
+        cx = width / 2
+        cy = height / 2
+        rospy.loginfo(camera_info.roi.width)
+        rospy.loginfo(camera_info.roi.height)
+
+        fov_x = 2 * math.atan(width / (2 * fx))
+        fov_y = 2 * math.atan(height / (2 * fy))
+        fix_fx = 253.88
+        fix_fy = 300.16
+
+        rospy.loginfo(
+            "Camera parameters received: c_x={}, c_y={}, f_x={}, f_y={}, FoV_x={}, FoV_y={}".format(
+                cx,
+                cy,
+                fx,
+                fy,
+                math.degrees(fov_x),
+                math.degrees(fov_y)))
+        rospy.loginfo("Calculated focal lengths: f_x_calculated={}, f_y_calculated={}".format(
+            fix_fx, fix_fy
+        ))
+
+        fix_fov_x = 2 * math.atan(width / (2 * fix_fx))
+        fix_fov_y = 2 * math.atan(height / (2 * fix_fy))
+        rospy.loginfo("{}, {}".format(fix_fov_x, fix_fov_y))
 
         # FOVを入れる配列をそれぞれ用意
         self.fov_x_range_array = np.zeros(width, dtype=np.float32)
@@ -152,21 +169,19 @@ class SemanticMappingNode:
             self.fov_y_range_array[y] = fov_y
 
     def calc_pixel_distance(self, camera_info: CameraInfo, z_difference: float) -> None:
-        width = camera_info.width
-        height = camera_info.height
+        width = camera_info.roi.width
+        height = camera_info.roi.height
 
-        if self.fov_y_range_array is None:
-            rospy.logwarn("FOV y range array is not available.")
-            return
-
-        # self.distance_map = np.zeros((height, width, 2), dtype=np.float32)
         self.distance_x_map = np.zeros((height, width), dtype=np.float32)
         self.distance_y_map = np.zeros((height, width), dtype=np.float32)
 
         for y in range(height):
             for x in range(width):
+                if abs(self.fov_y_range_array[y]) < 1e-6:
+                    rospy.logwarn("Skipping y={} due to near zero tan(fov_y)".format(y))
+                    continue
                 distance_y = z_difference / math.tan(self.fov_y_range_array[y])
-                self.distance_y_map[y, x] = distance_y + self.x_difference
+                self.distance_y_map[y, x] = distance_y
 
                 distance_x = self.distance_y_map[y, x] * math.tan(self.fov_x_range_array[x])
                 self.distance_x_map[y, x] = distance_x
@@ -174,7 +189,7 @@ class SemanticMappingNode:
     def mapping_image(self, msg: Image, camera_info: CameraInfo) -> None:
         # cv_bridgeを使ってImageメッセージをCV2形式の画像に変換
         cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="mono8")
-        height, width = cv_image.shape
+        image_height, image_width = cv_image.shape
 
         # OccupancyGridの基本情報を設定
         grid_map = OccupancyGrid()
@@ -182,43 +197,49 @@ class SemanticMappingNode:
         grid_map.header.stamp = rospy.Time.now()
         grid_map.header.frame_id = "base_link"
 
-        # 解像度をパラメータとして取得
-        resolution = rospy.get_param('~grid_resolution', 0.5)
-        # 投影範囲を決定（パラメータ化）
-        ground_width = rospy.get_param('~ground_width', 40)  # [m]
-        ground_height = rospy.get_param('~ground_height', 40)  # [m]
+        # 解像度と投影範囲を取得
+        resolution = rospy.get_param('~grid_resolution', 0.1)
+        ground_width = rospy.get_param('~ground_width', 10)  # グリッドの実際の幅 [m]
+        ground_height = rospy.get_param('~ground_height', 20)  # グリッドの実際の高さ [m]
 
-        # OccupancyGridの幅と高さを設定
-        grid_map.info.resolution = resolution
+        # グリッドの幅と高さをセル単位で計算
         grid_width = int(ground_width / resolution)
         grid_height = int(ground_height / resolution)
+
+        # グリッドの原点を設定
+        grid_origin_x = 0
+        grid_origin_y = -ground_height / 2
+        grid_map.info.resolution = resolution
         grid_map.info.width = grid_width
         grid_map.info.height = grid_height
+        grid_map.info.origin = Pose(Point(grid_origin_x, grid_origin_y, 0), Quaternion(0, 0, 0, 1))
 
-        # グリッドの原点を設定（カメラ画像を地面に投影したとき中央手前に設定）
-        # origin_x = self.distance_y_map[-1, mid_width_index]
-        origin_tfx = 0
-        origin_tfy = - ground_height / 2
-        grid_map.info.origin = Pose(Point(origin_tfx, origin_tfy, 0), Quaternion(0, 0, 0, 1))
-        grid_data = np.full((grid_width, grid_height), -1, dtype=np.int8)
+        # グリッドデータを初期化
+        grid_data = np.full((grid_height, grid_width), -1, dtype=np.int8)
 
-        start_y = int(camera_info.height / 2 + camera_info.height * 0.03)
-        # 中心よりy軸方向のsizeの3%ほど下の部分を投影する
-        # for y in range(start_y, height, 1):
-        for x in range(width):
-            for y in range(start_y, height, 1):
-                # for x in range(width):
-                pixel_value = cv_image[y, x]
-                if pixel_value == 255:
-                    pixel_value = 0
-                else:
-                    pixel_value = 100
-                grid_x = int((self.distance_y_map[y, x]) / resolution)
-                grid_y = (grid_height - int((self.distance_x_map[y, x] - origin_tfy) / resolution) - 1)
-                if 0 <= grid_x < grid_height and 0 <= grid_y < grid_width:
-                    grid_data[grid_y, grid_x] = pixel_value
+        start_y = int(camera_info.roi.height / 2 + camera_info.roi.height * 0.05)
+        # すべてのピクセルに対して処理を行う
+        for y in range(image_height):
+            if y < start_y:
+                continue
+            for x in range(image_width):
+                # 各ピクセルの距離を取得
+                map_distance_x = self.distance_y_map[y, x] + self.x_difference
+                map_distance_y = self.distance_x_map[y, image_width - x - 1]
 
-            # rospy.loginfo("%d, %d, %f", x, y, self.distance_y_map[y, x])
+                # グリッド座標に変換
+                grid_x = int((map_distance_x - grid_origin_x) / resolution)
+                grid_y = int((map_distance_y - grid_origin_y) / resolution)
+                # グリッド座標が範囲内かチェック
+                if 0 <= grid_x < grid_width and 0 <= grid_y < grid_height:
+                    pixel_value = cv_image[y, x]
+                    if pixel_value == 255:
+                        grid_value = 0  # 空きスペース
+                    else:
+                        grid_value = 100  # 占有スペース
+                    grid_data[grid_y, grid_x] = grid_value
+
+        # OccupancyGridのデータを設定してパブリッシュ
         grid_map.data = grid_data.flatten().tolist()
         self.occupancy_grid_pub.publish(grid_map)
 

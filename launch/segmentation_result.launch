@@ -12,12 +12,14 @@
 
   <node pkg="image_proc" type="image_proc" ns="/insta360/front" name="image_proc"/>
   <node pkg="nodelet" type="nodelet" args="standalone image_proc/crop_decimate" name="my_decimator">
-    <param name="x_offset" type="int" value="155"/>
-    <param name="y_offset" type="int" value="248"/>
-    <!-- <param name="width" type="int" value="533"/> -->
-    <!-- <param name="height" type="int" value="300"/> -->
-    <param name="width" type="int" value="426"/>
-    <param name="height" type="int" value="240"/>
+    <!-- <param name="x_offset" type="int" value="155"/> -->
+    <!-- <param name="y_offset" type="int" value="248"/> -->
+    <!-- <param name="width" type="int" value="426"/> -->
+    <!-- <param name="height" type="int" value="240"/> -->
+    <param name="x_offset" type="int" value="128"/>
+    <param name="y_offset" type="int" value="232"/>
+    <param name="width" type="int" value="480"/>
+    <param name="height" type="int" value="272"/>
 
     <!-- remap input topics -->
     <remap from="camera/image_raw" to="/insta360/front/image_rect_color"/>

@@ -67,7 +67,8 @@ class RoadSegmentationNode:
         self.image_sub = rospy.Subscriber(self.camera_topic, Image, self.image_callback)
         self.camera_info_sub = rospy.Subscriber(self.camera_info_topic, CameraInfo, self.camera_info_callback)
         self.camera_info_pub = rospy.Publisher('~result/camera_info', CameraInfo, queue_size=1)
-        self.result_pubs = [rospy.Publisher(f'~result/{name}_mask', Image, queue_size=1) for name in self.class_names]
+        self.result_pubs = [rospy.Publisher(f'~result/{name}_mask', Image, queue_size=1)
+                            for name in self.class_names]
         if self.debug:
             self.debug_image_pub = rospy.Publisher('~debug_image', Image, queue_size=1)
 
