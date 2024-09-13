@@ -17,19 +17,18 @@
 #
 
 import math
-import numpy as np
-import cv2
-from cv_bridge import CvBridge
 
+import numpy as np
 import rospy
 import tf
-from std_msgs.msg import Header
+from cv_bridge import CvBridge
 from geometry_msgs.msg import Point
 from geometry_msgs.msg import Pose
 from geometry_msgs.msg import Quaternion
 from nav_msgs.msg import OccupancyGrid
 from sensor_msgs.msg import CameraInfo
 from sensor_msgs.msg import Image
+from std_msgs.msg import Header
 
 
 class SemanticMappingNode:
@@ -58,7 +57,6 @@ class SemanticMappingNode:
         self.distance_y_map = None
         self.z_difference = None
         self.x_difference = None
-        self.resized_image = None
 
         # カメラの高さに関連する処理を実行
         self.handle_insta360_height()
@@ -120,13 +118,6 @@ class SemanticMappingNode:
             # ループを回す
             rate.sleep()
 
-    def image_resize(self, msg: Image, camera_info: CameraInfo) -> None:
-        # 画像をOpenCV形式に変換し、指定サイズにリサイズする
-        before_image = self.bridge.imgmsg_to_cv2(msg, "mono8")
-        image_resize = cv2.resize(before_image, (426, 240))
-        # リサイズ後の画像をROS形式に再変換
-        self.resized_image = self.bridge.cv2_to_imgmsg(image_resize, "mono8")
-
     def calc_pixel_degree(self, camera_info: CameraInfo) -> None:
         # カメラの焦点距離を取得
         fx = camera_info.K[0]
@@ -166,7 +157,6 @@ class SemanticMappingNode:
         for y in range(height):
             for x in range(width):
                 if abs(self.fov_y_range_array[y]) < 1e-6:
-                    # rospy.logwarn("Skipping y={} due to near zero tan(fov_y)".format(y))
                     continue
                 distance_y = z_difference / math.tan(self.fov_y_range_array[y])
                 self.distance_y_map[y, x] = distance_y
